@@ -321,7 +321,7 @@ export default function App() {
               {editId === s.id ? (
                 <span className="rename">
                   <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-                  <button onClick={() => saveTitle(s.id)}>저장</button>
+                  <button onClick={() => saveTitle(s.id)}>✓ 저장</button>
                 </span>
               ) : (
                 <>
@@ -329,8 +329,12 @@ export default function App() {
                     {s.title}
                   </button>
                   <span className="session-tools">
-                    <button onClick={() => startRename(s)}>수정</button>
-                    <button onClick={() => removeSession(s.id)}>삭제</button>
+                    <button onClick={() => startRename(s)} aria-label="수정" title="수정">
+                      ✏️
+                    </button>
+                    <button onClick={() => removeSession(s.id)} aria-label="삭제" title="삭제">
+                      🗑️
+                    </button>
                   </span>
                 </>
               )}

@@ -1,163 +1,368 @@
+:root {
+  --ink: #140f17;
+  --charcoal: #2c2c2c;
+  --cream: #eeede9;
+  --mist: #e9e9e7;
+  --pill: #edede8;
+  --gold: #c9a96e;
+  --ivory: #e8e4de;
+  --muted: #999999;
+  --label: #6b7280;
+  --tag: #f0eeeb;
+  --divider: #e5e7eb;
+  --card-via: #f8f7f5;
+  --danger: #a3402f;
+  --danger-bg: #f6e6e2;
+  --warn-text: #7a5a1e;
+  --warn-bg: #f4ead4;
+  --radius-card: 24px;
+  --radius-info: 16px;
+  --radius-btn: 50px;
+  --shadow-card: 0 16px 40px rgba(20, 15, 23, 0.14);
+  --shadow-btn: 0 8px 20px rgba(20, 15, 23, 0.22);
+}
+
 * {
   box-sizing: border-box;
 }
+
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
-  color: #222;
-  background: #fff;
+  font-family: "Pretendard Variable", Pretendard, -apple-system, system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--cream);
 }
+
 .app {
   display: flex;
   height: 100vh;
 }
+
+/* ── Sidebar ───────────────────────────────────────────── */
+
 .side {
-  width: 220px;
-  border-right: 1px solid #ddd;
-  padding: 12px;
+  width: 260px;
+  flex-shrink: 0;
+  padding: 22px 16px;
   overflow-y: auto;
+  background: var(--ink);
+  color: var(--ivory);
+  position: relative;
 }
+
+.side::before {
+  content: "💬 AI Chatbot";
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  margin: 2px 4px 20px;
+}
+
 .new {
   width: 100%;
-  padding: 8px;
+  padding: 12px;
+  margin-bottom: 20px;
+  border: none;
+  border-radius: var(--radius-btn);
+  background: #fff;
+  color: var(--ink);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
   cursor: pointer;
-  margin-bottom: 12px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--shadow-btn);
 }
+
+.new:hover {
+  transform: scale(0.97);
+}
+
 .session-list {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
+
 .session {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 0;
+  gap: 2px;
+  border-radius: var(--radius-info);
+  padding: 2px 4px;
+  border-left: 2px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
+
+.session:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.session.on {
+  background: rgba(201, 169, 110, 0.14);
+  border-left-color: var(--gold);
+}
+
 .session.on .session-title {
   font-weight: 700;
+  color: var(--gold);
 }
+
 .session-title {
   flex: 1;
   text-align: left;
   background: none;
   border: none;
-  padding: 4px;
+  padding: 9px 8px;
+  border-radius: var(--radius-info);
   cursor: pointer;
-  font-size: 14px;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: #c9c6cf;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.session-tools {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.session:hover .session-tools {
+  opacity: 1;
+}
+
 .session-tools button {
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px 7px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #c9c6cf;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.session-tools button:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: scale(1.08);
+}
+
+.rename {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 2px;
+}
+
+.rename input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.rename input:focus {
+  outline: 1px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.rename button {
+  font-family: inherit;
   font-size: 11px;
-  padding: 2px 4px;
+  font-weight: 700;
+  padding: 0 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--ink);
   cursor: pointer;
 }
+
+/* ── Chat column ───────────────────────────────────────── */
+
 .chat {
   flex: 1;
   display: flex;
   flex-direction: column;
-  max-width: 720px;
+  max-width: 760px;
+  width: 100%;
   margin: 0 auto;
-  padding: 16px;
+  padding: 24px 24px 18px;
+  min-width: 0;
 }
+
 .box {
   flex: 1;
-  border: 1px solid #ccc;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-card);
+  background: linear-gradient(180deg, #fff, var(--card-via));
+  box-shadow: var(--shadow-card);
   overflow-y: auto;
-  padding: 16px;
+  padding: 24px;
 }
-.user {
-  text-align: right;
-  margin: 10px 0;
-}
+
+.user,
 .bot {
-  text-align: left;
-  margin: 10px 0;
+  display: flex;
+  margin: 12px 0;
 }
+
+.user {
+  justify-content: flex-end;
+}
+
+.bot {
+  justify-content: flex-start;
+}
+
 .user p,
 .bot p {
   display: inline-block;
-  padding: 8px 12px;
-  border-radius: 8px;
+  max-width: 78%;
+  padding: 11px 16px;
+  border-radius: 18px;
   margin: 0;
   text-align: left;
+  line-height: 1.55;
+  font-size: 14.5px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
+
 .user p {
-  background: #d1e7ff;
+  background: var(--ink);
+  color: #fff;
+  border-bottom-right-radius: 6px;
 }
+
 .bot p {
-  background: #f0f0f0;
+  background: var(--tag);
+  color: var(--ink);
+  border-bottom-left-radius: 6px;
 }
-.rename {
-  display: flex;
-  gap: 4px;
-  width: 100%;
-}
-.rename input {
-  flex: 1;
-  min-width: 0;
-  padding: 4px;
-  font-size: 13px;
-}
-.rename button {
-  font-size: 11px;
-  padding: 2px 6px;
-  cursor: pointer;
-}
+
 .loading {
-  color: #888;
+  color: var(--label);
   font-style: italic;
+  font-size: 13.5px;
+  padding-left: 4px;
 }
+
+.loading::before {
+  content: "🤔 ";
+  font-style: normal;
+}
+
+/* ── Notices ───────────────────────────────────────────── */
+
+.notice {
+  margin: 0 0 10px;
+  padding: 10px 16px;
+  border-radius: var(--radius-info);
+  font-size: 13px;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.notice:not(.error)::before {
+  content: "☕ ";
+}
+
+.notice.error {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.notice.error::before {
+  content: "⚠️ ";
+}
+
+/* ── Input row ─────────────────────────────────────────── */
+
 .input-row {
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 10px;
+  margin-top: 16px;
 }
+
 .input-row input {
   flex: 1;
-  padding: 10px;
+  padding: 13px 18px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--divider);
+  background: #fff;
+  font-family: inherit;
+  font-size: 14.5px;
+  color: var(--ink);
+  transition: border-color 0.15s ease;
 }
+
+.input-row input:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+
+.input-row input::placeholder {
+  color: var(--muted);
+}
+
 .input-row button {
-  padding: 10px 18px;
+  padding: 0 26px;
+  border: none;
+  border-radius: var(--radius-btn);
+  background: var(--ink);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
   cursor: pointer;
+  box-shadow: var(--shadow-btn);
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
-.app-waking {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: #444;
+
+.input-row button::after {
+  content: " ↑";
 }
-.app-waking .hint {
-  font-size: 13px;
-  color: #888;
+
+.input-row button:hover:not(:disabled) {
+  transform: scale(0.96);
 }
-.wake-banner,
-.error-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 10;
+
+.input-row button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
 }
-.wake-banner {
-  background: #fdecea;
-  color: #a12b1f;
+
+/* ── Scrollbars ────────────────────────────────────────── */
+
+.side::-webkit-scrollbar,
+.box::-webkit-scrollbar {
+  width: 8px;
 }
-.error-banner {
-  background: #fff4e5;
-  color: #8a5a00;
+
+.side::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
 }
-.wake-banner button {
-  padding: 2px 8px;
-  cursor: pointer;
+
+.box::-webkit-scrollbar-thumb {
+  background: var(--divider);
+  border-radius: 8px;
 }
