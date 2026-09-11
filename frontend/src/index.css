@@ -123,3 +123,41 @@ body {
   padding: 10px 18px;
   cursor: pointer;
 }
+.app-waking {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #444;
+}
+.app-waking .hint {
+  font-size: 13px;
+  color: #888;
+}
+.wake-banner,
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+}
+.wake-banner {
+  background: #fdecea;
+  color: #a12b1f;
+}
+.error-banner {
+  background: #fff4e5;
+  color: #8a5a00;
+}
+.wake-banner button {
+  padding: 2px 8px;
+  cursor: pointer;
+}
