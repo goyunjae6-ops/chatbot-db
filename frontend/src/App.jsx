@@ -1,39 +1,54 @@
 import { useState, useEffect } from "react";
 
-const API = "https://chatbot-db-back-bfxv.onrender.com";
+// 배포할 때는 VITE_API_URL에 렌더 주소를 넣는다.
+// 값이 없으면 로컬 서버를 쓴다.
+// 예) VITE_API_URL=https://chatbot-db-back-f4ut.onrender.com
+const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
-// 렌더 무료 티어는 일정 시간 요청이 없으면 서버가 슬립 상태로 전환되고,
-// 슬립 상태에서 깨어날 때 첫 요청이 30~60초 이상 걸릴 수 있다.
-// fetch에 타임아웃을 걸고, 실패하면 잠시 대기 후 재시도한다.
-async function fetchWithRetry(url, options = {}, { timeout = 20000, retries = 3, retryDelay = 3000 } = {}) {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout);
-    try {
-      const res = await fetch(url, { ...options, signal: controller.signal });
-      clearTimeout(timer);
-      return res;
-    } catch (err) {
-      clearTimeout(timer);
-      if (attempt === retries) throw err;
-      await new Promise((r) => setTimeout(r, retryDelay));
-    }
-  }
-}
+/* ────────────────────────────────────────────────────────────
+   렌더(Render) 무료 플랜 방어 코드
 
-// 서버가 응답할 때까지 /health를 반복 호출해 슬립 상태를 깨운다.
-async function wakeServer({ timeout = 20000, interval = 3000, maxWait = 90000 } = {}) {
-  const start = Date.now();
-  while (Date.now() - start < maxWait) {
-    try {
-      const res = await fetchWithRetry(`${API}/health`, {}, { timeout, retries: 0 });
-      if (res.ok) return true;
-    } catch {
-      // 무시하고 재시도
-    }
-    await new Promise((r) => setTimeout(r, interval));
+   무료 플랜 서버는 15분 동안 요청이 없으면 잠든다(슬립).
+   잠든 서버는 첫 요청에서 30~60초를 그냥 기다리게 만든다.
+   기본 fetch는 이때 무한정 매달리거나 그냥 실패해 버린다.
+
+   그래서 아래 여섯 가지를 넣는다.
+   1. 요청마다 제한 시간을 둔다(AbortController).
+   2. 실패하면 잠깐 쉬었다 다시 시도한다.
+   3. 오래 걸리면 "서버 깨우는 중"이라고 화면에 알린다.
+   4. AI 요청은 원래 느리다. 이 요청만 제한 시간을 길게 준다.
+   5. 화면이 열려 있는 동안 주기적으로 두드려 슬립 자체를 막는다.
+   6. 끊긴 메시지는 함부로 다시 보내지 않는다. 먼저 저장됐는지 확인한다.
+   ──────────────────────────────────────────────────────────── */
+
+// 일반 요청 1회당 최대 대기 시간(밀리초)
+const REQ_TIMEOUT = 20000;
+// AI 응답 요청 1회당 최대 대기 시간(밀리초).
+// 백엔드가 AI를 기다리는 시간보다 넉넉해야 한다.
+const AI_TIMEOUT = 100000;
+// 일반 요청 재시도 횟수
+const REQ_RETRY = 2;
+// 첫 접속 때 서버를 깨우며 기다리는 최대 시간(밀리초)
+const WAKE_TIMEOUT = 120000;
+// "깨우는 중" 안내를 띄우기 시작하는 시점(밀리초)
+const WAKE_NOTICE_AFTER = 3000;
+// 슬립을 막으려고 서버를 두드리는 간격(밀리초).
+// 렌더는 15분 동안 요청이 없으면 잠든다. 그보다 짧게 잡는다.
+const KEEPALIVE_INTERVAL = 600000;
+// 깨우기·keep-alive 두드림 1회당 대기 시간(밀리초)
+const PING_TIMEOUT = 10000;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// 제한 시간이 있는 fetch. 시간이 지나면 요청을 취소한다.
+async function fetchWithTimeout(url, options = {}, timeout = REQ_TIMEOUT) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeout);
+  try {
+    return await fetch(url, { ...options, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
   }
-  return false;
 }
 
 export default function App() {
@@ -45,15 +60,116 @@ export default function App() {
   const [msgs, setMsgs] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [waking, setWaking] = useState(true);
-  const [wakeFailed, setWakeFailed] = useState(false);
+
+  // 서버가 자고 있어 깨우는 중인지
+  const [waking, setWaking] = useState(false);
+  // 사용자에게 보여줄 오류 문구
   const [error, setError] = useState("");
+
+  /* 공통 API 호출기.
+     실패하면 재시도하고, 오래 걸리면 waking 표시를 켠다. */
+  const api = async (
+    path,
+    options = {},
+    retry = REQ_RETRY,
+    timeout = REQ_TIMEOUT
+  ) => {
+    setError("");
+    // 응답이 늦으면 "깨우는 중" 안내를 켠다.
+    const notice = setTimeout(() => setWaking(true), WAKE_NOTICE_AFTER);
+
+    try {
+      let lastErr = null;
+
+      for (let i = 0; i <= retry; i++) {
+        try {
+          const res = await fetchWithTimeout(`${API}${path}`, options, timeout);
+
+          // 5xx는 서버 쪽 일시 장애다. 다시 시도한다.
+          if (res.status >= 500) {
+            lastErr = new Error(`서버 오류 (${res.status})`);
+          } else if (!res.ok) {
+            // 4xx는 다시 보내도 결과가 같다. 바로 끝낸다.
+            let detail = `요청 실패 (${res.status})`;
+            try {
+              const body = await res.json();
+              if (body?.detail) detail = body.detail;
+            } catch {
+              // 본문이 JSON이 아니면 기본 문구를 쓴다.
+            }
+            const fatal = new Error(detail);
+            fatal.noRetry = true;
+            throw fatal;
+          } else {
+            return await res.json();
+          }
+        } catch (e) {
+          // 4xx로 우리가 직접 만든 오류는 재시도하지 않는다.
+          if (e.noRetry) throw e;
+          lastErr =
+            e.name === "AbortError"
+              ? new Error("서버 응답이 없습니다. (시간 초과)")
+              : e;
+        }
+
+        // 마지막 시도가 아니면 잠깐 쉬었다 다시 건다. 2초 → 4초
+        if (i < retry) await sleep(2000 * 2 ** i);
+      }
+
+      throw lastErr ?? new Error("알 수 없는 오류");
+    } catch (e) {
+      setError(e.message);
+      throw e;
+    } finally {
+      clearTimeout(notice);
+      setWaking(false);
+    }
+  };
+
+  /* 첫 접속 때 서버를 깨운다.
+     /health는 DB도 AI도 건드리지 않는 가장 가벼운 요청이다. */
+  const wakeServer = async () => {
+    const deadline = Date.now() + WAKE_TIMEOUT;
+    let wait = 2000;
+
+    while (Date.now() < deadline) {
+      try {
+        const res = await fetchWithTimeout(`${API}/health`, {}, PING_TIMEOUT);
+        if (res.ok) return true;
+      } catch {
+        // 아직 안 깨어났다. 아래에서 기다렸다 다시 두드린다.
+      }
+      setWaking(true);
+      await sleep(wait);
+      // 대기 시간을 늘리되 8초를 넘기지 않는다.
+      wait = Math.min(wait * 1.5, 8000);
+    }
+    return false;
+  };
+
+  /* 화면이 열려 있는 동안 서버가 잠들지 않게 주기적으로 두드린다.
+     실패해도 그냥 넘어간다. 화면에 오류를 띄우지 않는다. */
+  useEffect(() => {
+    const ping = () => {
+      // 숨겨진 탭은 두드리지 않는다. 쓸데없는 요청을 줄인다.
+      if (document.hidden) return;
+      fetchWithTimeout(`${API}/health`, {}, PING_TIMEOUT).catch(() => {});
+    };
+
+    const timer = setInterval(ping, KEEPALIVE_INTERVAL);
+    // 다른 탭에 갔다가 돌아오면 곧바로 한 번 두드린다.
+    document.addEventListener("visibilitychange", ping);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", ping);
+    };
+  }, []);
 
   // func
   // 세션데이터 로드
   const loadSessions = async () => {
-    const res = await fetchWithRetry(`${API}/sessions`);
-    const data = await res.json();
+    const data = await api(`/sessions`);
     setSession(data.sessions);
     return data.sessions;
   };
@@ -64,52 +180,47 @@ export default function App() {
       setMsgs([]);
       return;
     }
-    const res = await fetchWithRetry(`${API}/sessions/${id}/messages`);
-    const data = await res.json();
-    console.log(res);
+    const data = await api(`/sessions/${id}/messages`);
     setMsgs(data.messages);
   };
   //선택된 세션 아이디 저장
   const openSession = (id) => {
     setSessionId(id);
-    loadMsg(id);
+    loadMsg(id).catch(() => {});
   };
 
   //새로운 세션 추가
   const newSession = async () => {
-    const res = await fetchWithRetry(`${API}/sessions`, { method: "POST" }, { retries: 0 });
-    const data = await res.json();
-    await loadSessions();
-    setSessionId(data.id);
-    setMsgs([]);
+    try {
+      const data = await api(`/sessions`, { method: "POST" });
+      await loadSessions();
+      setSessionId(data.id);
+      setMsgs([]);
+    } catch {
+      // 오류 문구는 api 안에서 이미 상태에 담았다.
+    }
   };
 
-  // 렌더 서버를 깨운 뒤 세션 목록을 불러온다
-  const connect = () => {
-    setWaking(true);
-    setWakeFailed(false);
-    wakeServer()
-      .then((awake) => {
-        setWaking(false);
-        setWakeFailed(!awake);
-        return loadSessions();
-      })
-      .then((list) => {
-        if (list && list.length > 0) {
-          setSessionId(list[0].id);
-          loadMsg(list[0].id);
-        }
-      })
-      .catch(() => {
-        setWaking(false);
-        setWakeFailed(true);
-      });
-  };
-
-  // 앱 시작 시 1회 실행
+  // 리액트 컴포넌트 상태에 따라 함수실행을 제어
   useEffect(() => {
-    connect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // 먼저 서버를 깨우고, 깨어난 뒤에 데이터를 부른다.
+    (async () => {
+      const awake = await wakeServer();
+      setWaking(false);
+      if (!awake) {
+        setError("서버를 깨우지 못했습니다. 잠시 뒤 새로고침해 주세요.");
+        return;
+      }
+      try {
+        const list = await loadSessions();
+        if (list.length > 0) {
+          setSessionId(list[0].id);
+          await loadMsg(list[0].id);
+        }
+      } catch {
+        // 오류 문구는 api 안에서 이미 상태에 담았다.
+      }
+    })();
   }, []);
 
   // 수정할 세션의 아이디, 타이틀로 선택
@@ -120,64 +231,74 @@ export default function App() {
   // 세션 타이틀 수정
   const saveTitle = async (id) => {
     try {
-      await fetchWithRetry(
-        `${API}/sessions/${id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: editTitle }),
-        },
-        { retries: 0 }
-      );
+      await api(`/sessions/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editTitle }),
+      });
       setEditId(null);
       await loadSessions();
     } catch {
-      setError("서버 응답이 없습니다. 잠시 후 다시 시도해주세요.");
+      // 오류 문구는 api 안에서 이미 상태에 담았다.
     }
   };
   // 세션삭제
   const removeSession = async (id) => {
-    if (!id) return;
-
     try {
-      const res = await fetchWithRetry(`${API}/sessions/${id}`, { method: "DELETE" }, { retries: 0 });
-      if (!res.ok) {
-        console.error("삭제 실패", await res.text());
-        return;
-      }
+      await api(`/sessions/${id}`, { method: "DELETE" });
+      const list = await loadSessions();
+      const next = list.length > 0 ? list[0].id : null;
+      setSessionId(next);
+      await loadMsg(next);
     } catch {
-      setError("서버 응답이 없습니다. 잠시 후 다시 시도해주세요.");
-      return;
+      // 오류 문구는 api 안에서 이미 상태에 담았다.
     }
-
-    const list = await loadSessions();
-    const next = list.length > 0 ? list[0].id : null;
-    setSessionId(next);
-    await loadMsg(next);
   };
+  /* 요청이 끊겼을 때, 서버에 실제로 저장됐는지 확인한다.
+     저장돼 있으면 다시 보내지 않는다. 같은 말이 두 번 들어가는 걸 막는다. */
+  const isSaved = async (id, text) => {
+    try {
+      const data = await api(`/sessions/${id}/messages`);
+      setMsgs(data.messages);
+      return data.messages.some((m) => m.role === "user" && m.text === text);
+    } catch {
+      // 확인조차 못 했다. 저장 안 된 것으로 본다.
+      return false;
+    }
+  };
+
   //사용자의 메시지를 서버로 전달후 응답결과 반환
   const send = async () => {
-    if (!input.trim() || !sessionId) return;
+    if (!input.trim() || !sessionId || loading) return;
     const text = input;
     setInput("");
     setLoading(true);
-    setError("");
     try {
-      // 서버가 슬립 상태였다가 깨어나는 경우 + AI 응답 생성 시간을 고려해 넉넉한 타임아웃을 둔다.
-      await fetchWithRetry(
-        `${API}/sessions/${sessionId}/messages`,
+      /* AI 응답은 원래 오래 걸린다. 제한 시간을 길게 준다.
+         그리고 재시도는 하지 않는다.
+         이 요청은 DB에 글을 쓴다. 다시 보내면 같은 말이 두 번 저장된다. */
+      await api(
+        `/sessions/${sessionId}/messages`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text }),
         },
-        { timeout: 60000, retries: 0 }
+        0,
+        AI_TIMEOUT
       );
       await loadMsg(sessionId);
       await loadSessions();
     } catch {
-      setError("서버 응답이 없습니다. 잠시 후 다시 시도해주세요.");
-      setInput(text);
+      // 끊겼어도 서버에는 저장됐을 수 있다. 먼저 확인한다.
+      if (await isSaved(sessionId, text)) {
+        await loadSessions();
+        // api 안에서 오류 문구를 지우므로, 안내는 맨 마지막에 세운다.
+        setError("답변을 받지 못했습니다. 잠시 뒤 다시 열어 보세요.");
+      } else {
+        // 정말 안 갔다. 입력한 글을 돌려줘서 다시 보낼 수 있게 한다.
+        setInput(text);
+      }
     } finally {
       setLoading(false);
     }
@@ -188,26 +309,10 @@ export default function App() {
     if (e.key === "Enter") send();
   };
 
-  if (waking) {
-    return (
-      <div className="app-waking">
-        <p>서버를 깨우는 중입니다...</p>
-        <p className="hint">무료 서버가 잠자기 상태였다면 최대 1분 정도 걸릴 수 있어요.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="app">
-      {wakeFailed && (
-        <div className="wake-banner">
-          서버에 연결할 수 없습니다.
-          <button type="button" onClick={connect}>다시 시도</button>
-        </div>
-      )}
-      {error && <div className="error-banner">{error}</div>}
       <aside className="side">
-        <button type="button" className="new" onClick={newSession}>
+        <button className="new" onClick={newSession}>
           + 새 대화
         </button>
         <ul className="session-list">
@@ -216,24 +321,16 @@ export default function App() {
               {editId === s.id ? (
                 <span className="rename">
                   <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-                  <button type="button" onClick={() => saveTitle(s.id)}>저장</button>
+                  <button onClick={() => saveTitle(s.id)}>저장</button>
                 </span>
               ) : (
                 <>
-                  <button type="button" className="session-title" onClick={() => openSession(s.id)}>
+                  <button className="session-title" onClick={() => openSession(s.id)}>
                     {s.title}
                   </button>
                   <span className="session-tools">
-                    <button type="button" onClick={() => startRename(s)}>이름</button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeSession(s.id);
-                      }}
-                    >
-                      삭제
-                    </button>
+                    <button onClick={() => startRename(s)}>수정</button>
+                    <button onClick={() => removeSession(s.id)}>삭제</button>
                   </span>
                 </>
               )}
@@ -243,6 +340,10 @@ export default function App() {
       </aside>
 
       <main className="chat">
+        {waking && (
+          <p className="notice">서버를 깨우는 중입니다. 최대 1분 정도 걸립니다.</p>
+        )}
+        {error && <p className="notice error">{error}</p>}
         <div className="box">
           {msgs.map((m) => (
             <div key={m.id} className={m.role}>
@@ -253,7 +354,7 @@ export default function App() {
         </div>
         <div className="input-row">
           <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey} placeholder="메시지를 입력하세요" />
-          <button type="button" onClick={send}>전송</button>
+          <button onClick={send} disabled={loading}>전송</button>
         </div>
       </main>
     </div>
