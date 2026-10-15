@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createReplyPresentation, prefersReducedMotion } from './replyPresentation';
 
-const API = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : '')).replace(/\/$/, '');
+const API = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : '')).replace(/\/+$/, '');
 
 async function request(path, options = {}, timeout = 85000) {
   if (!API && import.meta.env.PROD) throw new Error('서버 주소가 설정되지 않았습니다. 배포 환경에 VITE_API_URL을 설정해 주세요.');

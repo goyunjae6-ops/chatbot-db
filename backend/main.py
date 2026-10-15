@@ -27,6 +27,7 @@ app.add_middleware(
         "https://two026-chatbot-frontend.onrender.com",
         "https://chatbot-db-front-x8gl.onrender.com",
         *[origin.strip().rstrip("/") for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()],
+        *[origin.strip().rstrip("/") for origin in os.getenv("FRONTEND_ORIGINS", "").split(",") if origin.strip()],
     ],
     allow_credentials=True,
     allow_methods=["*"],
