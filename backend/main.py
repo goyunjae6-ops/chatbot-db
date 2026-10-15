@@ -12,6 +12,7 @@ print(app)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://chatbot-db-front-x8gl.onrender.com",
         "https://two026-chatbot-frontend.onrender.com",
         *[origin.strip().rstrip("/") for origin in os.getenv("FRONTEND_ORIGINS", "").split(",") if origin.strip()],
         "http://localhost:5173",
