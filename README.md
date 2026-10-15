@@ -1,151 +1,102 @@
-# 🤖 AI Chatbot
+# 윤재피티 AI Chatbot
 
-FastAPI와 React(Vite), 그리고 Hugging Face AI 모델(`Qwen/Qwen3-4B-Instruct-2507`)을 연동한 풀스택 AI 챗봇 웹 애플리케이션입니다.
+FastAPI · React · SQLite 기반의 한국어 대화 앱입니다.
 
----
 
-## 🌐 배포 도메인 (Live Services)
+## 추가된 대화와 실용 기능
 
-현재 서비스는 **Render** 플랫폼을 통해 프론트엔드와 백엔드가 각각 분리 배포되어 운영 중입니다.
+기본 모드는 등록된 지식 카드와 계산 도구를 연결합니다. 외부 AI나 검색 API는 호출하지 않습니다.
 
-| 구분 | 서비스 | URL |
-| :--- | :--- | :--- |
-| **Frontend** | React 웹 클라이언트 (Static Site) | [https://two026-chatbot-frontend.onrender.com](https://two026-chatbot-frontend.onrender.com) |
-| **Backend** | FastAPI 서버 (Web Service) | [https://two026-chatbot-backend.onrender.com](https://two026-chatbot-backend.onrender.com) |
-| **API Docs** | Swagger UI (대화형 API 문서) | [https://two026-chatbot-backend.onrender.com/docs](https://two026-chatbot-backend.onrender.com/docs) |
-| **Repository** | GitHub 저장소 | [https://github.com/goyunjae6-ops/ai-chatbot](https://github.com/goyunjae6-ops/ai-chatbot) |
+- 개발: 변수·리스트·딕셔너리·튜플·문자열·조건문·반복문·함수·객체지향·예외 처리·자료구조·알고리즘·웹 기초
+- 기초 지식: 평균과 중앙값·소수·분수·윤년·광합성·자전과 공전·중력·증발
+- 일상과 글쓰기: 회의·발표·목표 설정·피드백·여행 준비·정리 정돈·독서·일기·영어 공부
+- 후속 질문: `리스트가 뭐야?` → `예시 좀 보여줘` → `문제 하나 내줘` → `정답 알려줘`
+- 수치 도구: `퍼센트: 200의 15%`, `50000원 20% 할인하면 얼마야?`, `평균: 10, 20, 30`, `정렬: 9, 2, 5`
+- 날짜 도구: `날짜 차이: 2026-10-15, 2026-12-25`, `2026-12-25에서 7일 뒤는?`
+- 텍스트 도구: `중복 제거: 사과, 배, 사과`, `목록 정리: 빨래, 공부`, `대문자로: hello`
+- 입력형 초안: `자기소개 작성: 이름=윤재; 분야=웹 개발; 경험=챗봇 제작; 목표=개발자`
+- 이메일 틀 채우기: `이메일 작성: 받는사람=담당자; 주제=일정 문의; 내용=일정을 확인하고 싶습니다`
 
----
+후속 질문은 최근의 알려진 지식 카드 주제만 연결합니다. 일반적인 문맥 추론, 임의의 정답 채점은 하지 않습니다.
+계산은 자릿수·개수 제한을 두며, 소수 결과는 표시 자릿수에 맞춰 반올림합니다.
+초안은 입력값을 고정된 문장에 넣는 방식이며 사실이나 경력을 새로 만들지 않습니다. 이메일을 전송하지 않습니다.
+화면의 `질문 예시 보기` 버튼이나 `질문 예시` 메시지로 입력 형식을 볼 수 있습니다.
 
-## 🛠️ 기술 스택 (Tech Stack)
 
-### Frontend
-- **Framework / Tool**: React 19, Vite
-- **Language**: JavaScript (ES Module)
-- **Styling**: Vanilla CSS
-- **Deployment**: Render Static Site
+## 무료 기본 답변 모드
 
-### Backend
-- **Framework**: FastAPI, Uvicorn
-- **Language**: Python 3.10+
-- **Data Validation**: Pydantic
-- **Environment Management**: Python-dotenv
-- **Deployment**: Render Web Service
+기본값은 `CHAT_MODE=basic`입니다. 이 모드는 외부 AI API를 호출하지 않으며 키와 크레딧이 필요 없습니다.
+일반적인 AI 모델이 아니라 규칙과 계산 코드로 동작합니다.
 
-### AI Model
-- **Platform**: Hugging Face Inference API (`router.huggingface.co`)
-- **Model**: `Qwen/Qwen3-4B-Instruct-2507`
+- `안녕`, `뭐 할 수 있어?`
+- `계산: (12 + 8) * 3`
+- `내 이름은 윤재`, `내 이름이 뭐야?`
+- `메모: 내일 회의`, `메모 보여줘`
+- `파이썬 공부 방법`, `챗봇 사용법`
 
----
+계산은 숫자·괄호·사칙연산·나머지·몫만 지원합니다. 임의의 Python 코드를 실행하지 않습니다.
+이름과 메모는 해당 대화의 최근 기록에서만 찾습니다. 별도 영구 메모장이나 알림 기능은 아닙니다.
+자유로운 글 생성, 실시간 검색, 임의의 코딩 질문에 대한 추론은 지원하지 않습니다.
 
-## 📁 프로젝트 구조 (Directory Structure)
+나중에 실제 AI로 전환하려면 `backend/.env`에 `CHAT_MODE=huggingface`를 지정하고,
+사용 가능한 `HF_MODEL`, 권한 있는 `HF_TOKEN`, 계정 크레딧을 준비한 뒤 서버를 재시작합니다.
+`basic` 모드에서는 기존 HF 토큰이 남아 있어도 사용하지 않습니다.
+화면 상단과 하단에 현재 모드를 표시합니다.
 
-```plaintext
-chatbot/
-├── backend/
-│   ├── main.py              # FastAPI 서버 엔드포인트 및 Hugging Face API 연동
-│   ├── requirements.txt     # 백엔드 의존성 패키지 목록
-│   └── .env                 # Hugging Face 토큰 환경변수 (보안상 .gitignore 처리)
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx          # 채팅 인터페이스 UI 및 API 호출 로직
-│   │   ├── main.jsx         # React 진입점
-│   │   └── index.css        # 채팅창 스타일링
-│   ├── index.html           # HTML 템플릿
-│   ├── package.json         # 프론트엔드 의존성 및 실행 스크립트
-│   └── vite.config.js       # Vite 설정 파일
-└── README.md                # 프로젝트 문서
+
+## 로컬 실행
+
+`start.bat`을 실행하거나 프로젝트 루트에서 `node launch.mjs`를 실행합니다.
+런처는 비어 있는 백엔드 포트를 고르고 Vite의 `/api` 프록시를 자동 연결합니다.
+프론트엔드를 따로 실행하면 `npm run dev`의 `/api`는 기본적으로 `127.0.0.1:8000`으로 연결됩니다.
+
+`backend/.env` 설정:
+
+```dotenv
+HF_TOKEN=your_hugging_face_token
+HF_MODEL=Qwen/Qwen3-4B-Instruct-2507
+# 배포 사이트 주소가 다르면 쉼표로 추가
+CORS_ORIGINS=https://your-frontend.onrender.com
+# 배포에서는 영구 디스크 경로 지정 권장
+# CHAT_DB_PATH=/var/data/chat.db
 ```
 
----
+`CHAT_MODE=huggingface`로 실제 AI를 사용할 때만 Hugging Face 계정의 추론 권한과 사용 가능 크레딧이 필요합니다. 기본 답변 모드에는 필요하지 않습니다.
+기존 Qwen3-4B 모델은 현재 계정에서 지원되지 않았고, 대체 모델 테스트에서는 크레딧 소진(402)이 확인됐습니다.
+서버 `/health`의 `ai_configured`는 토큰의 존재만 확인하며 인증 유효성이나 잔액을 보장하지 않습니다.
 
-## 🚀 로컬 실행 가이드 (Local Development)
+## 배포
 
-### 1. 사전 요구사항
-- Node.js 18 이상
-- Python 3.10 이상
-- Hugging Face Access Token
+Backend: 루트 `backend`, 설치 `pip install -r requirements.txt`, 시작 `uvicorn main:app --host 0.0.0.0 --port $PORT`.
+Frontend: 루트 `frontend`, 설치/빌드 `npm ci && npm run build`, 결과 `dist`.
+프론트엔드 환경변수 `VITE_API_URL`을 실제 백엔드 HTTPS 주소로 설정한 뒤 재빌드합니다.
+백엔드 `CORS_ORIGINS`에는 프론트엔드 HTTPS 주소를 설정합니다.
+SQLite는 `CHAT_DB_PATH`로 영구 디스크에 저장해야 재배포 시 기록을 유지할 수 있습니다.
 
-### 2. 저장소 복제
-```bash
-git clone https://github.com/goyunjae6-ops/ai-chatbot.git
-cd ai-chatbot
-```
+현재는 로그인 없는 단일 사용자 데모이며 대화 목록은 서버 공용입니다.
+여러 사람에게 공개하기 전 사용자 인증과 사용자별 데이터 분리가 필요합니다. 비밀이나 민감한 대화는 입력하지 마세요.
+답변 품질은 연결된 모델에 따라 달라지며 웹 검색, 파일 분석, 도구 실행은 포함하지 않습니다.
 
-### 3. 백엔드 설정 및 실행
-```bash
-cd backend
+## 주요 동작
 
-# 가상환경 생성 및 활성화
-python -m venv .venv
-# Windows PowerShell
-.venv\Scripts\Activate.ps1
-# macOS/Linux
-source .venv/bin/activate
+- 첫 질문 전송 시 새 대화 자동 생성, 여러 줄 입력, 한글 조합 Enter 처리
+- 대화 검색, 제목 변경, 삭제 확인, 메시지 복사, 텍스트 내보내기
+- 답변 대기 표시, 명확한 오류 안내, 실패한 요청의 재시도와 수정
+- 성공한 질문/답변을 한 트랜잭션으로 저장하고 요청 ID로 중복 저장 방지
+- 대화 기록을 AI에 전달하고 최근 기록의 길이를 제한
+- 모바일 대화 목록과 반응형 화면
 
-# 의존성 패키지 설치
-pip install -r requirements.txt
+같은 대화의 동시 요청은 단일 서버 프로세스에서 제한합니다. 여러 워커/인스턴스로 확장하려면 분산 잠금이 필요합니다.
+AI 호출에 실패하면 질문/답변을 DB에 저장하지 않습니다. 실패한 전송의 재시도 정보는 현재 브라우저 화면에만 유지됩니다.
 
-# .env 파일 생성 후 토큰 설정
-echo "HF_TOKEN=your_huggingface_token_here" > .env
+## 검증
 
-# 백엔드 서버 시작 (기본 포트: 8000)
-uvicorn main:app --reload
-```
-
-### 4. 프론트엔드 설정 및 실행
-새 터미널을 열고 다음 명령어를 실행합니다:
-```bash
+```powershell
+pip install -r backend/requirements-dev.txt
+python -m unittest discover -s backend -p 'test_*.py' -v
 cd frontend
-
-# 패키지 설치
-npm install
-
-# 개발 서버 실행 (기본 포트: 5173)
-npm run dev
+npm run lint
+npm run build
 ```
 
-브라우저에서 `http://localhost:5173`으로 접속하여 테스트합니다.
-
----
-
-## 📡 API 명세서 (API Specification)
-
-### `POST /chat`
-사용자의 메시지를 전달받아 Hugging Face AI 모델의 답변을 반환합니다.
-
-#### Request
-- **URL**: `/chat`
-- **Method**: `POST`
-- **Headers**: `Content-Type: application/json`
-- **Body**:
-  ```json
-  {
-    "text": "안녕하세요!"
-  }
-  ```
-
-#### Response
-- **Status Code**: `200 OK`
-- **Body**:
-  ```json
-  {
-    "reply": "안녕하세요! 무엇을 도와드릴까요?"
-  }
-  ```
-
----
-
-## 🚢 배포 설정 (Render Deployment)
-
-### Backend (Web Service)
-- **Root Directory**: `backend`
-- **Build Command**: `pip install -r requirements.txt`
-- **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-- **Environment Variables**:
-  - `HF_TOKEN`: Hugging Face API User Access Token
-
-### Frontend (Static Site)
-- **Root Directory**: `frontend`
-- **Build Command**: `npm run build`
-- **Publish Directory**: `dist`
+백엔드 테스트는 임시 DB와 가짜 AI 응답을 사용하며 실제 대화 DB와 유료 API를 사용하지 않습니다.

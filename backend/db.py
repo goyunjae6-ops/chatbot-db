@@ -1,7 +1,9 @@
 import sqlite3
 import time
+import os
+from pathlib import Path
 
-DB_PATH = "chat.db"
+DB_PATH = os.getenv("CHAT_DB_PATH", str(Path(__file__).resolve().with_name("chat.db")))
 
 
 def get_conn():
@@ -38,6 +40,14 @@ def init_db():
             role TEXT NOT NULL,
             text TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS requests (
+            request_id TEXT PRIMARY KEY,
+            session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+            text TEXT NOT NULL,
+            reply TEXT NOT NULL
         )
     """)
     conn.commit()
@@ -117,3 +127,37 @@ def delete_session(session_id):
     changed = cur.rowcount
     conn.close()
     return changed
+
+
+def get_session(session_id):
+    conn = get_conn()
+    try:
+        row = conn.execute("SELECT id, title FROM sessions WHERE id = ?", (session_id,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def save_exchange(session_id, text, reply, request_id):
+    conn = get_conn()
+    try:
+        with conn:
+            if request_id:
+                conn.execute("INSERT INTO requests (request_id, session_id, text, reply) VALUES (?, ?, ?, ?)",
+                             (request_id, session_id, text, reply))
+            count = conn.execute("SELECT COUNT(*) FROM messages WHERE session_id = ?", (session_id,)).fetchone()[0]
+            conn.executemany("INSERT INTO messages (session_id, role, text) VALUES (?, ?, ?)",
+                             [(session_id, "user", text), (session_id, "bot", reply)])
+            if count == 0:
+                conn.execute("UPDATE sessions SET title = ? WHERE id = ?", (text[:40], session_id))
+    finally:
+        conn.close()
+
+
+def get_request(request_id):
+    conn = get_conn()
+    try:
+        row = conn.execute("SELECT session_id, text, reply FROM requests WHERE request_id = ?", (request_id,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
