@@ -1,8 +1,17 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import process from 'node:process'
+import { defineConfig, loadEnv } from 'vite'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode, command }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const apiUrl = process.env.VITE_API_URL || env.VITE_API_URL
+  if (command === 'build' && mode === 'production') {
+    if (!apiUrl || !/^https:\/\//.test(apiUrl) || /localhost|127\.0\.0\.1/.test(apiUrl)) {
+      throw new Error('Set VITE_API_URL to the deployed HTTPS backend URL before building.')
+    }
+  }
+  return {
   plugins: [
     react({
       babel: {
@@ -10,4 +19,5 @@ export default defineConfig({
       },
     }),
   ],
+  }
 })

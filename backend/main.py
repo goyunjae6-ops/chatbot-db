@@ -12,6 +12,8 @@ print(app)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://two026-chatbot-frontend.onrender.com",
+        *[origin.strip().rstrip("/") for origin in os.getenv("FRONTEND_ORIGINS", "").split(",") if origin.strip()],
         "http://localhost:5173",
         "http://localhost:5174",
         "http://localhost:5175",
@@ -48,7 +50,15 @@ def ask_ai(history):
         "messages": history,
         "max_tokens": 1000,
     }
-    res = requests.post(HF_URL, headers=headers, json=payload)
+    if not token:
+        raise HTTPException(status_code=503, detail="AI 서버의 API 토큰 설정을 확인해 주세요.")
+    try:
+        res = requests.post(HF_URL, headers=headers, json=payload, timeout=(10, 75))
+        res.raise_for_status()
+    except requests.Timeout:
+        raise HTTPException(status_code=504, detail="AI 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요.")
+    except requests.RequestException:
+        raise HTTPException(status_code=502, detail="AI 서비스에 연결하지 못했습니다.")
     data = res.json()
     return data["choices"][0]["message"]["content"]
 

@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 // 배포할 때는 VITE_API_URL에 렌더 주소를 넣는다.
 // 값이 없으면 로컬 서버를 쓴다.
 // 예) VITE_API_URL=https://chatbot-db-back-f4ut.onrender.com
-const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(/\/+$/, "");
 
 /* ────────────────────────────────────────────────────────────
    렌더(Render) 무료 플랜 방어 코드
