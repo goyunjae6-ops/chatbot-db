@@ -1,5 +1,10 @@
 # 윤재피티 AI Chatbot
 
+## 프로젝트 기획서
+
+- [발표용 기획서 PDF](docs/yoonjaept-project-introduction.pdf)
+- [편집 가능한 PowerPoint](docs/yoonjaept-project-introduction.pptx)
+
 FastAPI · React · SQLite 기반의 한국어 대화 앱입니다.
 
 
